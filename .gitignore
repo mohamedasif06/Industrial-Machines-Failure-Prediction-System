@@ -1,0 +1,31 @@
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-cache-files-*/
+
+# Node.js and frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Secrets and local environment settings
+.env
+.env.*
+!.env.example
+
+# Keep trained models required by the application
+# Do not ignore models/*.joblib or models/metadata.json
+
+# Ignore generated processed datasets
+data/processed/*
+Data/processed/*
+!data/processed/.gitkeep
+!Data/processed/.gitkeep
+
+# Editor and operating system files
+.DS_Store
+Thumbs.db
