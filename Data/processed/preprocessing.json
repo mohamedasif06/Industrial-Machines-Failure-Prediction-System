@@ -1,0 +1,36 @@
+{
+  "source_dataset": "Data\\raw\\ai4i2020.csv",
+  "input_features": [
+    "Type",
+    "Air temperature [K]",
+    "Process temperature [K]",
+    "Rotational speed [rpm]",
+    "Torque [Nm]",
+    "Tool wear [min]"
+  ],
+  "target": "Machine failure",
+  "excluded_source_columns": [
+    "UDI",
+    "Product ID",
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+  ],
+  "type_encoding": {
+    "method": "integer category encoding",
+    "fit_on": "training split only",
+    "mapping": {
+      "H": 0,
+      "L": 1,
+      "M": 2
+    },
+    "note": "Codes are category identifiers, not a numeric order or measured quantity."
+  },
+  "split": {
+    "test_size": 0.2,
+    "random_seed": 42,
+    "stratified_by": "Machine failure"
+  }
+}
