@@ -79,10 +79,14 @@ const latestA = event('SIM-A', 2_000, 0);
 const activeAlert = managedAlert('SIM-B:failure_associated_prediction:1', 'SIM-B', 'active', 50, second);
 const resolvedAlert = managedAlert('SIM-A:failure_associated_prediction:1', 'SIM-A', 'resolved', 12, latestA);
 
-function installBackend({ unavailable = false, manyFailureEvents = false } = {}) {
+function installBackend({ unavailable = false, manyFailureEvents = false, authenticated = true } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (unavailable) throw new Error('Backend offline');
+    if (url.endsWith('/api/auth/session')) return { ok: true, json: async () => ({ authenticated, username: authenticated ? 'demo-user' : null }) };
+    if (url.endsWith('/api/auth/login')) return { ok: true, json: async () => ({ authenticated: true, username: 'demo-user' }) };
+    if (url.endsWith('/api/auth/register')) return { ok: true, status: 201, json: async () => ({ authenticated: true, username: 'new-user' }) };
+    if (url.endsWith('/api/auth/logout')) return { ok: true, json: async () => ({ authenticated: false, username: null }) };
     const repeatedFailureEvents = manyFailureEvents
       ? Array.from({ length: 50 }, (_, index) => event('SIM-B', index * 10, 1))
       : [];
@@ -126,6 +130,44 @@ afterEach(() => {
 });
 
 describe('backend-connected application', () => {
+  it('shows the accessible login form for an unauthenticated session and signs in', async () => {
+    const fetchMock = installBackend({ authenticated: false });
+    renderApp();
+    expect(await screen.findByRole('heading', { name: /Industrial Machine Failure/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Username')).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'demo-user' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'demo-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    expect(await screen.findByRole('heading', { name: 'Machine Health Overview' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/auth/login'), expect.objectContaining({ credentials: 'include' }));
+  });
+
+  it('logs out through the backend session and returns to the login page', async () => {
+    const fetchMock = installBackend();
+    renderApp();
+    expect(await screen.findByRole('heading', { name: 'Machine Health Overview' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Sign out/i }));
+    expect(await screen.findByRole('heading', { name: /Industrial Machine Failure/i })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/auth/logout'), expect.objectContaining({ method: 'POST', credentials: 'include' }));
+  });
+
+  it('validates sign-up confirmation and registers through the backend', async () => {
+    const fetchMock = installBackend({ authenticated: false });
+    renderApp();
+    fireEvent.click(await screen.findByRole('link', { name: /Create an account/i }));
+    expect(await screen.findByRole('heading', { name: /Create your account/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'new-user' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'safe-password' } });
+    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'different-password' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/do not match/i);
+    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'safe-password' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
+    expect(await screen.findByRole('heading', { name: 'Machine Health Overview' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/auth/register'), expect.objectContaining({ method: 'POST', credentials: 'include' }));
+  });
+
   it('loads REST state and history, distinguishes event and machine counts, and reports true socket state', async () => {
     installBackend();
     renderApp();

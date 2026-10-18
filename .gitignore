@@ -17,6 +17,15 @@ frontend/.vite/
 .env.*
 !.env.example
 
+# Authentication database and local instance files
+backend/instance/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+*.sqlite3
+*.sqlite3-journal
+
 # Keep trained models required by the application
 # Do not ignore models/*.joblib or models/metadata.json
 

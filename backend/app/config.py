@@ -15,6 +15,20 @@ def allowed_origins() -> list[str]:
     return [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
 
 
+def auth_cookie_secure() -> bool:
+    return os.getenv("AUTH_COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def session_cookie_name() -> str:
+    return "industrial_session"
+
+
+def auth_database_path() -> Path:
+    """Return the local SQLite path used for registered accounts."""
+    configured = os.getenv("AUTH_DATABASE_PATH", "").strip()
+    return Path(configured) if configured else PROJECT_ROOT / "backend" / "instance" / "users.sqlite3"
+
+
 def event_history_limit() -> int:
     try:
         limit = int(os.getenv("BACKEND_EVENT_HISTORY_LIMIT", "1000"))

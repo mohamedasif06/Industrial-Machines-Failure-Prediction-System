@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Activity, Bell, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Menu, Play, Radio, Square, X } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTelemetry } from '../hooks/useTelemetry';
 import { SimulatedBadge } from '../components/StatusBadge';
 import type { SimulationMode } from '../types/telemetry';
+import { useAuth } from '../services/auth';
 
 const navigation = [
   { to: '/', label: 'Operations Overview', Icon: LayoutDashboard, end: true },
@@ -16,6 +17,8 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<SimulationMode>('normal');
   const [machineCount, setMachineCount] = useState(3);
+  const navigate = useNavigate();
+  const { state: authState, logout } = useAuth();
   const {
     events, loading, error, activeAlertCount, connectionState, isStale, simulatorStatus, simulatorBusy,
     simulatorError, startSimulator, stopSimulator,
@@ -23,6 +26,7 @@ export function AppShell() {
   const connectionLabel = connectionState[0].toUpperCase() + connectionState.slice(1);
   const activeModeLabel = simulatorStatus?.mode === 'fault_scenario' ? 'Fault Scenario' : simulatorStatus?.mode === 'mixed' ? 'Mixed' : 'Normal';
   const startLabel = selectedMode === 'fault_scenario' ? 'Start Fault Scenario' : selectedMode === 'mixed' ? 'Start Mixed Simulation' : 'Start Normal Simulation';
+  const handleLogout = async () => { try { await logout(); navigate('/login', { replace: true }); } catch (reason) { console.error(reason); } };
 
   return (
     <div className="app-shell">
@@ -45,6 +49,8 @@ export function AppShell() {
           <button className="mobile-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
           <div className="breadcrumb"><span>PLANT 01</span><span className="breadcrumb-divider">/</span><strong>TELEMETRY OVERVIEW</strong></div>
           <div className="topbar-status">
+            <span className="user-chip" title="Authenticated account">{authState.user?.username}</span>
+            <button className="button button-small" onClick={() => void handleLogout()}>Sign out</button>
             {events.length > 0 && <SimulatedBadge />}
             <span className={`backend-pill connection-${connectionState}`} role="status"><span className="backend-dot" />Backend: {connectionLabel}</span>
             {isStale && <span className="stale-pill">Stale data</span>}

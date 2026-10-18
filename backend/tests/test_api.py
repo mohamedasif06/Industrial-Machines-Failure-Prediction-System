@@ -1,11 +1,15 @@
 """API, store, simulator lifecycle, WebSocket, and saved-model integration checks."""
 
 import asyncio
+import sqlite3
 import sys
+import tempfile
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_ROOT.parent
@@ -15,6 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from app.main import create_app
 from app.services.inference_service import InferenceService
 from app.services.telemetry_service import TelemetryService
+from app.services.auth_service import AuthService, make_password_hash
 
 
 FEATURES = {
@@ -64,7 +69,10 @@ class FakeInference:
 def make_client(inference=None, telemetry=None):
     inference = inference or FakeInference()
     telemetry = telemetry or TelemetryService(history_limit=20)
-    return TestClient(create_app(inference, telemetry)), inference, telemetry
+    auth = AuthService("test-user", make_password_hash("test-password"))
+    client = TestClient(create_app(inference, telemetry, auth))
+    assert client.post("/api/auth/login", json={"username": "test-user", "password": "test-password"}).status_code == 200
+    return client, inference, telemetry
 
 
 def test_health_reports_model_availability():
@@ -73,6 +81,46 @@ def test_health_reports_model_availability():
     assert response.status_code == 200
     assert response.json()["model_available"] is True
     assert response.json()["recommended_model"] == "XGBoost"
+
+
+def test_authentication_rejects_unauthenticated_requests_and_supports_logout():
+    auth = AuthService("test-user", make_password_hash("test-password"))
+    client = TestClient(create_app(FakeInference(), TelemetryService(history_limit=20), auth))
+    assert client.get("/api/machines").status_code == 401
+    assert client.post("/api/auth/login", json={"username": "unknown", "password": "test-password"}).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "test-user", "password": "wrong"}).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "test-user"}).status_code == 422
+    login = client.post("/api/auth/login", json={"username": "test-user", "password": "test-password"})
+    assert login.status_code == 200
+    assert "password" not in login.text.lower()
+    assert client.get("/api/machines").status_code == 200
+    assert client.get("/api/auth/session").json() == {"authenticated": True, "username": "test-user"}
+    assert client.post("/api/auth/logout").status_code == 200
+    assert client.get("/api/machines").status_code == 401
+    assert client.get("/api/auth/session").json() == {"authenticated": False, "username": None}
+
+
+def test_registration_persists_hashes_and_rejects_duplicates():
+    with tempfile.TemporaryDirectory() as directory:
+        auth = AuthService(database_path=Path(directory) / "users.sqlite3")
+        client = TestClient(create_app(FakeInference(), TelemetryService(history_limit=20), auth))
+        response = client.post("/api/auth/register", json={"username": "new-user", "password": "safe-password"})
+        assert response.status_code == 201
+        assert response.json() == {"authenticated": True, "username": "new-user"}
+        duplicate = client.post("/api/auth/register", json={"username": "new-user", "password": "safe-password"})
+        assert duplicate.status_code == 409
+        with sqlite3.connect(Path(directory) / "users.sqlite3") as connection:
+            stored = connection.execute("SELECT password_hash FROM users WHERE username = ?", ("new-user",)).fetchone()[0]
+        assert stored != "safe-password"
+        assert stored.startswith("scrypt$")
+
+
+def test_websocket_requires_session_cookie():
+    auth = AuthService("test-user", make_password_hash("test-password"))
+    client = TestClient(create_app(FakeInference(), TelemetryService(history_limit=20), auth))
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/telemetry") as websocket:
+            websocket.receive_json()
 
 
 def test_prediction_accepts_exactly_six_inputs_and_calls_inference():
@@ -273,7 +321,9 @@ def test_websocket_publishes_alert_lifecycle_and_reconnect_snapshot(monkeypatch)
 
 
 def test_existing_saved_model_inference_integration():
-    client = TestClient(create_app(InferenceService(), TelemetryService()))
+    auth = AuthService("test-user", make_password_hash("test-password"))
+    client = TestClient(create_app(InferenceService(), TelemetryService(), auth))
+    client.post("/api/auth/login", json={"username": "test-user", "password": "test-password"})
     response = client.post("/api/predict", json=FEATURES)
     assert response.status_code == 200, response.text
     body = response.json()

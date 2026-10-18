@@ -168,6 +168,7 @@ export function mergeManagedAlerts(current: ManagedAlert[], incoming: ManagedAle
 async function getJson<T>(path: string, signal?: AbortSignal, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
+    credentials: 'include',
     signal: signal ?? init.signal,
     headers: { Accept: 'application/json', ...init.headers },
   });

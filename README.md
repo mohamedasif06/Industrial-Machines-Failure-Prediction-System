@@ -23,6 +23,10 @@ Target: `Machine failure`. `UDI`, `Product ID`, and failure-mode columns are not
 
 The simulator generates independent synthetic readings; it does not replay the historical CSV or require physical IoT hardware. Each reading contains only the six agreed model inputs, calls the saved recommended model through `src/inference.py`, and includes the model-predicted class and estimated probability when supported. The model predicts a failure class from operating measurements; it does not promise a failure at a particular future time. Fault scenarios are synthetic combinations for exploring model/alert behavior and are not confirmed real-world failures. Model probabilities are estimates, not guaranteed real-world probabilities.
 
+## Account registration and sign in
+
+The dashboard provides Sign Up and Sign In pages. Registration stores a scrypt password hash and creation timestamp in the ignored local SQLite file `backend/instance/users.sqlite3`, then establishes a server-validated HttpOnly session. Accounts remain available on the same machine while that database file is preserved. The browser never stores passwords or session IDs in local storage. Sign out invalidates the session. Local HTTP uses `AUTH_COOKIE_SECURE=false`; enable secure cookies only when serving over HTTPS. This is suitable for a college prototype, not a production factory security system.
+
 Start three simulated machines in normal mode, generating readings every two seconds until Ctrl+C:
 
 ```powershell

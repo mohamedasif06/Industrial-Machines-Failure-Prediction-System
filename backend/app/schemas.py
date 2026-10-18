@@ -31,6 +31,22 @@ class PredictionRequest(BaseModel):
         }
 
 
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(min_length=3, max_length=50, pattern=r"^[A-Za-z0-9_.-]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+
+class RegisterRequest(LoginRequest):
+    """Validated account registration fields."""
+
+
+class AuthUserResponse(BaseModel):
+    authenticated: bool
+    username: str | None = None
+
+
 class PredictionResponse(BaseModel):
     predicted_class: Literal[0, 1]
     predicted_label: str

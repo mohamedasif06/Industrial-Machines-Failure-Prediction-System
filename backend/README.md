@@ -21,7 +21,15 @@ $env:BACKEND_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 $env:BACKEND_EVENT_HISTORY_LIMIT = "1000"
 ```
 
-The default CORS origins are the local Vite development URLs. CORS allows only GET/POST and `Content-Type`, without credentials. Event history is in memory and resets when the process restarts.
+The default CORS origins are the local Vite development URLs. Credentialed browser requests are allowed only from those origins. Event history is in memory and resets when the process restarts.
+
+## Account authentication
+
+Users register through `POST /api/auth/register`; the backend stores only a scrypt password hash, unique username, and UTC creation timestamp in the ignored local SQLite file `backend/instance/users.sqlite3`. Set `AUTH_DATABASE_PATH` in the environment to use another location. Preserve this file to preserve accounts on the same machine, and never commit it because it contains user information. Duplicate usernames return HTTP 409.
+
+The backend uses an opaque, in-memory session ID in an HttpOnly, SameSite cookie. `AUTH_COOKIE_SECURE=false` is appropriate for local HTTP; use `true` behind HTTPS. Sessions expire according to `AUTH_SESSION_TTL_SECONDS` and logout invalidates them. This single-process college prototype does not require a signing secret; a production deployment would need shared session storage and managed secrets.
+
+Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`. `GET /api/health` is public. Prediction, machine, event, alert, simulator, and telemetry WebSocket endpoints require the session cookie. All registered users receive the same ordinary dashboard permissions. This flow is suitable for a college demonstration, not a production factory security system.
 
 ## API
 
@@ -84,7 +92,7 @@ WebSocket messages and REST event objects use the existing simulator event field
 }
 ```
 
-Only events with `simulated: true` are accepted. Duplicate machine/timestamp pairs are ignored. The bounded in-memory store serves latest-per-machine views and recent event history; a process restart clears both. No physical sensor, breakdown confirmation, persistence, authentication, or deployment integration exists in this phase.
+Only events with `simulated: true` are accepted. Duplicate machine/timestamp pairs are ignored. The bounded in-memory store serves latest-per-machine views and recent event history; a process restart clears both. No physical sensor, breakdown confirmation, persistence, or deployment integration exists in this phase.
 
 ## Tests
 

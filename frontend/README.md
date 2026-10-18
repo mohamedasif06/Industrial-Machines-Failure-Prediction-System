@@ -25,6 +25,8 @@ npm run dev
 
 Open the Vite URL printed in the terminal (default `http://127.0.0.1:5173`). Stop each service with Ctrl+C in its terminal. Backend CORS allows both `http://127.0.0.1:5173` and `http://localhost:5173` by default.
 
+Open the app at the Vite URL and choose **Create an account** to register. Successful registration signs the user in and opens Operations Overview. Existing users choose **Sign in**. Sign out is available in the dashboard shell. If the backend cannot be reached, check its CORS setting, database path, and that the backend was started before retrying.
+
 ## Frontend configuration
 
 Vite uses `VITE_API_BASE_URL` for REST and derives `ws:` or `wss:` `/ws/telemetry` from that URL. The local default is `http://127.0.0.1:8000`. `VITE_STALE_AFTER_MS` sets the no-valid-update threshold in milliseconds (default `60000`). To override, create `frontend/.env.local` using `.env.example` as a template, then restart Vite. These settings contain no secrets.
